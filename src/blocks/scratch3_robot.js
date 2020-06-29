@@ -2,7 +2,7 @@ const Cast = require('../util/cast');
 const MathUtil = require('../util/math-util');
 const Timer = require('../util/timer');
 //const Robot_command = require('../robot/robot_command');
-
+const Renderer = require('scratch-render');
 const MOTORS_ON_DELTA = 50;
 const DEGREE_RATIO = 5.19;
 
@@ -62,8 +62,31 @@ class Scratch3RobotBlocks {
           this.power_left  =  Math.round(this.power_in_percent_left * 0.63);
           this.power_right =  Math.round(this.power_in_percent_right * 0.63);
 
-          
+
         });
+        this.sim_ac=true;
+        this.kW=0.05; // шаг движения робота
+        this.fps = 6; // Скорость обработки кадров инверсивно меняется 1000/5 = 200   = 72 клетки  =
+        this.rad= 1000;// угол поворопа меняет
+        this.xc= 0;
+        this.yc=0;
+        this.sim_dist_l=0;
+        this.sim_dist_r=0;
+        this.wall_color=[255,255,255];
+        this.sim_pl = 63;
+        this.sim_pr = 63;
+        this.sim_int = null;
+        this.distl=0;
+        this.distr=0;
+        this.minidist = 0;
+        this.robot_delta_x=0;
+        this.robot_delta_y=0;
+        this.ddx =0;
+        this.ddy = 0;
+        this.ddp=[];  this.ddp[0]=0; this.ddp[1]=0; this.ddp[2]=0;
+        this.ddd = []; this.ddd[0]=0;
+        this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
+        this.ddl = 0 ;
     }
 
     /**
@@ -90,9 +113,12 @@ class Scratch3RobotBlocks {
             robot_claw_state:this.robot_claw_state,
             robot_reset_trip_meters: this.robot_reset_trip_meters,
             robot_get_rgb_sensor_data: this.robot_get_rgb_sensor_data,
-            robot_is_current_color:this.robot_is_current_color
+            robot_is_current_color:this.robot_is_current_color,
 
-
+            robot_set_sens:this.robot_set_sens,
+            robot_get_dist:this.robot_get_dist,
+            robot_touch:this.robot_touch,
+            robot_wall_color:this.robot_wall_color
         };
     }
 
@@ -103,7 +129,6 @@ class Scratch3RobotBlocks {
     }
 
   robot_motors_on_for_seconds (args, util) {
-
       clearTimeout(this.robot_motors_on_for_seconds_end_timeout);
 
        this.robot_motors_on_for_seconds_end_timeout = setTimeout(() => {
@@ -122,8 +147,9 @@ class Scratch3RobotBlocks {
                   util.yield();
                   return;
               }
-              else{      
+              else{
                   util.stackFrame.timer = undefined;
+                  clearTimeout(this.sim_int);
                   clearTimeout(this.robot_motors_on_for_seconds_end_timeout);
                   this.runtime.RCA.setRobotPower(0,0,0);
                   this.runtime.RCA.unblock_A_CommandQueue();
@@ -139,6 +165,27 @@ class Scratch3RobotBlocks {
           util.stackFrame.timer = new Timer();
           util.stackFrame.timer.start();
           util.stackFrame.duration = Cast.toNumber(args.SECONDS);
+          if(this.sim_ac){
+              this.xc=util.target.x;
+              this.yc=util.target.y;
+              this.sim_int = setInterval(() => {
+             const radians = MathUtil.degToRad(90 - util.target.direction);
+             let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+             this.sim_dist_l+=Math.abs(this.sim_pl*this.kW);
+             this.sim_dist_r+=Math.abs(this.sim_pr*this.kW);
+             const dx = dist * Math.cos(radians);
+             const dy = dist * Math.sin(radians);
+             this.yc+=dy;
+             this.xc+=dx;
+             util.target.setXY(this.xc, this.yc);
+             if(util.target.isTouchingColor(this.wall_color)){
+               this.yc-=dy;
+               this.xc-=dx;
+               util.target.setXY(this.xc, this.yc);
+             }
+             util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
+              }, this.fps);
+          }
           if (util.stackFrame.duration <= 0) {
               return;
           }
@@ -159,8 +206,41 @@ class Scratch3RobotBlocks {
     //         console.warn(frame);
     //     });
 
+  this.xc=util.target.x;
+  this.yc=util.target.y;
+  const radians = MathUtil.degToRad(90 - util.target.direction);
+  let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+  const dx = dist * Math.cos(radians);
+  const dy = dist * Math.sin(radians);
+  this.yc+=dy;
+  this.xc+=dx;
+  util.target.setXY(this.xc, this.yc);
 
-      
+  clearInterval(this.sim_int);
+  if(this.sim_ac){
+    console.warn(util.target);
+    console.warn(util.target.toJSON());
+    this.sim_int = setInterval(() => {
+      const radians = MathUtil.degToRad(90 - util.target.direction);
+      let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+      this.sim_dist_l+=Math.abs(this.sim_pl*this.kW);
+      this.sim_dist_r+=Math.abs(this.sim_pr*this.kW);
+      const dx = dist * Math.cos(radians);
+      const dy = dist * Math.sin(radians);
+      this.yc+=dy;
+      this.xc+=dx;
+
+      util.target.setXY(this.xc, this.yc);
+      if(util.target.isTouchingColor(this.wall_color)){
+        this.yc-=dy;
+        this.xc-=dx;
+        util.target.setXY(this.xc, this.yc);
+      }
+      util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
+      }, this.fps);
+  }
+
+
 
       let power_left = this.power_left;
       let power_right = this.power_right;
@@ -195,11 +275,11 @@ class Scratch3RobotBlocks {
        this.motors_on_loop_need = true;
 
       /**
-         We depends on hardware response time. This way we need to sync blocks runtime with hardware. 
-         So here we block "a command (which only returns telemetry)", sync block with hardware (with isRobotReadyToSendCommand()) and use only "c command (motion and telemetry)". 
+         We depends on hardware response time. This way we need to sync blocks runtime with hardware.
+         So here we block "a command (which only returns telemetry)", sync block with hardware (with isRobotReadyToSendCommand()) and use only "c command (motion and telemetry)".
       **/
 
-      //this.runtime.RCA.block_A_CommandQueue(); 
+      //this.runtime.RCA.block_A_CommandQueue();
 
 
     //  console.log(`this.runtime.RCA.robot_motors_on(${power_left},${power_right})  Time: ${Date.now() - this.time}`);
@@ -216,13 +296,13 @@ class Scratch3RobotBlocks {
           // this.time_sent1 = Date.now();
            this.runtime.RCA.unblock_A_CommandQueue();
            clearInterval(this.a_command_unblock_interval);
-          
-          
-      
+
+
+
       }else{
 
-         this.runtime.RCA.block_A_CommandQueue();  
-         
+         this.runtime.RCA.block_A_CommandQueue();
+
         //  if ( this.a_command_unblock_interval == null){
 
         //       this.a_command_unblock_interval = setInterval(() => {
@@ -238,20 +318,20 @@ class Scratch3RobotBlocks {
         //   }
 
          util.yield();
-        
+
 
       }
-       
+
     // this.is_motors_on_active = true;
     // this.motors_on_interval =   setInterval((runtime,self) => {
 
-    
+
 
     //   if (!self.need_to_stop){
 
     //     if (self.motors_on_loop_need){
 
-     
+
 
     //       if (runtime.RCA.isRobotReadyToSendCommand()){
 
@@ -260,10 +340,10 @@ class Scratch3RobotBlocks {
     //          this.command_sent = true;
     //          this.runtime.RCA.unblock_A_CommandQueue();
     //          this.time_sent1 = Date.now();
-      
+
     //       }else{
 
-    //           this.runtime.RCA.block_A_CommandQueue(); 
+    //           this.runtime.RCA.block_A_CommandQueue();
     //           this.command_sent = false;
 
     //       }
@@ -302,9 +382,9 @@ class Scratch3RobotBlocks {
 
      // console.log(`motors on_off delta: ${this.time_sent2 - this.time_sent1}`);
 
-    
 
 
+      clearInterval(this.sim_int);
       clearInterval(this.motors_on_interval);
       clearInterval(this.motors_off_interval);
 
@@ -324,23 +404,23 @@ class Scratch3RobotBlocks {
            this.runtime.RCA.unblockPowerCommand();
            this.runtime.RCA.unblock_A_CommandQueue();
            clearInterval(this.a_command_unblock_interval);
-          
-          
-      
+
+
+
       }else{
 
-         this.runtime.RCA.block_A_CommandQueue();  
+         this.runtime.RCA.block_A_CommandQueue();
          this.runtime.RCA.blockPowerCommand();
-         
+
          util.yield();
-        
+
 
       }
 
 
      // this.runtime.RCA.setRobotPower(0,0,0);
 
-     // this.runtime.RCA.unblock_A_CommandQueue(); 
+     // this.runtime.RCA.unblock_A_CommandQueue();
 
       //  this.time_sent3 = Date.now();
 
@@ -374,7 +454,8 @@ class Scratch3RobotBlocks {
           //  this.power = Math.round(this.power_in_percent * 0.63);
             this.power_left   =   Math.round(this.power_in_percent_left * 0.63);
             this.power_right  =   Math.round(this.power_in_percent_right * 0.63);
-
+            this.sim_pl=Math.round(this.power_in_percent_left * 0.63);
+            this.sim_pr=Math.round(this.power_in_percent_right * 0.63);
           break;
 
           case "direction_backward":
@@ -382,7 +463,8 @@ class Scratch3RobotBlocks {
           //  this.power = Math.round(this.power_in_percent * 0.63) + 64;
             this.power_left   =   Math.round(this.power_in_percent_left * 0.63) +  64;
             this.power_right  =   Math.round(this.power_in_percent_right * 0.63) +  64;
-
+            this.sim_pl=-Math.round(this.power_in_percent_left * 0.63);
+            this.sim_pr=-Math.round(this.power_in_percent_right * 0.63);
           break;
 
           case "direction_left":
@@ -390,7 +472,8 @@ class Scratch3RobotBlocks {
           //  this.power = Math.round(this.power_in_percent * 0.63);
             this.power_left     =   Math.round(this.power_in_percent_left * 0.63) +  64;
             this.power_right    =   Math.round(this.power_in_percent_right * 0.63);
-
+            this.sim_pl=-Math.round(this.power_in_percent_left * 0.63);
+            this.sim_pr=Math.round(this.power_in_percent_right * 0.63);
           break;
 
           case "direction_right":
@@ -398,60 +481,24 @@ class Scratch3RobotBlocks {
           //  this.power = Math.round(this.power_in_percent * 0.63);
             this.power_left   =   Math.round(this.power_in_percent_left * 0.63);
             this.power_right  =   Math.round(this.power_in_percent_right * 0.63) +  64;
-
+            this.sim_pl=Math.round(this.power_in_percent_left * 0.63);
+            this.sim_pr=-Math.round(this.power_in_percent_right * 0.63);
           break;
 
         default:
 
       }
 
-      
+
 
     }
 
+
     robot_set_direction_to(args, util){
 
-        //  console.log(`robot_set_direction_to`);
-
-          // if (this.set_direction_block_step == 1){
-
-          //    this.robot_direction = args.ROBOT_DIRECTION;
-
-          //    this.update_power_using_direction(this.robot_direction);
-
-
-          //   //синхронизируем с блоком motors on //нужно дождаться пока motors on не отправит пакет с выставленным здесь направлением
-          //   //если motors on  не работает, мы не ждём
-            
-          //    if (this.is_motors_on_active){
-
-
-          //     this.command_sent = false; 
-          //     this.set_direction_block_step = 2;
-          //     util.yield(); 
-
-          //    }
-             
-
-          // }else if (this.set_direction_block_step == 2){ //баг, если прерываем блок между двумя шагами
-
-          //   if  ((!this.command_sent) && (this.is_motors_on_active) ) {
-
-          //       util.yield();
-
-          //    }else{
-
-          //       this.set_direction_block_step = 1;
-
-          //    }
-
-          // }
 
           this.time_sent1 = Date.now();
           this.time_sent3 = this.time_sent1 - this.time_sent2;
-
-          //console.log(`time sent delta: ${this.time_sent3} robot_direction: ${args.ROBOT_DIRECTION}`);
-
           this.time_sent2 = Date.now();
 
 
@@ -463,23 +510,18 @@ class Scratch3RobotBlocks {
 
                 if (this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                      
+
                    this.activate_robot_power();
-                   this.runtime.RCA.unblock_A_CommandQueue();  
-          
-                  
+                   this.runtime.RCA.unblock_A_CommandQueue();
+
+
                   }else{
-
-                    //return;
-
-                    this.runtime.RCA.block_A_CommandQueue();  
+                    this.runtime.RCA.block_A_CommandQueue();
                     util.yield();
-                    
-
                   }
 
             }
-      
+
 
     }
 
@@ -487,12 +529,150 @@ class Scratch3RobotBlocks {
     activate_robot_power(){
 
         this.runtime.RCA.setRobotPower(this.power_left,this.power_right,0);
-           
+
     }
+    robot_touch(util,a)
+    {
+      if(this.minidist==0){
+      var radians = MathUtil.degToRad(90 - util.target.direction);
+      if(a==3 || a==2)
+      radians = MathUtil.degToRad(90 - util.target.direction+180);
+      const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
+      this.ddx = 1 * Math.cos(radians);
+      this.ddy = 1 * Math.sin(radians);
+      this.robot_delta_x = delta * Math.cos(new_rad);
+      this.robot_delta_y = delta * Math.sin(new_rad);
+      this.ddp = [];this.ddp[0]=util.target.x; this.ddp[1]=util.target.y; this.ddp[2]=0;
+      this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+      this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
+      this.ddl= [];
+      }
+      if(this.minidist!=5)
+      {
+        this.ddp[0]=Math.round(util.target.x+this.ddx*this.minidist+this.robot_delta_x);
+        this.ddp[1]=Math.round(util.target.y+this.ddy*this.minidist+this.robot_delta_y);
+        this.ddl = Renderer.getColor(this.ddp,this.ddd[0],this.ddc);
+      if(this.ddl[0]==this.wall_color[0]&&this.ddl[1]==this.wall_color[1]&&this.ddl[2]==this.wall_color[2])
+      {
+        let a = this.minidist;
+        this.minidist=0;
+        return 100;
+      }
+      this.minidist++;
+      }
+      else {
+        this.minidist=0;
+        return 0;
+      }
+      console.warn("dist: "+this.minidist + "\n color " + this.ddl[0]+ " " + this.ddl[1]+ " " + this.ddl[2]+ "mesto"+ this.ddp[0]+" "+this.ddp[1]);
+      util.yield();
+    }
+    robot_get_dist(util,a,angle,delta)
+    {
+            if(this.minidist==0){
+            var radians = MathUtil.degToRad(90 - util.target.direction);
+            if(a==3 || a==2)
+            radians = MathUtil.degToRad(90 - util.target.direction+180);
+            const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
+            this.ddx = 1 * Math.cos(radians);
+            this.ddy = 1 * Math.sin(radians);
+            this.robot_delta_x = delta * Math.cos(new_rad);
+            this.robot_delta_y = delta * Math.sin(new_rad);
+            this.ddp = [];this.ddp[0]=util.target.x; this.ddp[1]=util.target.y; this.ddp[2]=0;
+            this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+            this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
+            this.ddl= [];
+            }
+            if(this.minidist!=255)
+            {
+              this.ddp[0]=Math.round(util.target.x+this.ddx*this.minidist+this.robot_delta_x);
+              this.ddp[1]=Math.round(util.target.y+this.ddy*this.minidist+this.robot_delta_y);
+              this.ddl = Renderer.getColor(this.ddp,this.ddd[0],this.ddc);
+            if(this.ddl[0]==this.wall_color[0]&&this.ddl[1]==this.wall_color[1]&&this.ddl[2]==this.wall_color[2])
+            {
+              let a = this.minidist;
+              this.minidist=0;
+              return a;
+            }
+            this.minidist++;
+            }
+            else {
+              this.minidist=0;
+              return -1;
+            }
+            console.warn("dist: "+this.minidist + "\n color " + this.ddl[0]+ " " + this.ddl[1]+ " " + this.ddl[2]+ "mesto"+ this.ddp[0]+" "+this.ddp[1]);
+            util.yield();
+    }
+    robot_set_sens(util,a)
+    {
+      console.log("robot set sens"+ a + "sens list"+ this.runtime.sens_list[a]);
+      var radians=0,dx=0,dy=0;
+      const delta = 10;
+      var ang = 0;
+      if(a==1)ang=315;else if(a==2)ang=225;else if (a==3)ang=135;else if(a==4)ang=45;
+      switch(this.runtime.sens_list[a])//"nosensor","line","led","light","touch","proximity","ultrasonic","color"
+      {
+      case "nosensor":
+          return -1;
+      break;
+      case "line":
+      console.log("line");
+          var p=[];
+          radians = MathUtil.degToRad(90 - util.target.direction+ang);
+          dx = delta * Math.cos(radians);
+          dy = delta * Math.sin(radians);
+          p[0]=util.target.x+dx; p[1]=util.target.y+dy; p[2]=0;
+          var d = []; d[0]=util.target.renderer._allDrawables[0];
+          var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
+          var l= [];
+          l = Renderer.getColor(p,d[0],c);
+          sensor_data= Math.round(l[0]+l[1]+l[2])/3;
+          console.log(sensor_data);
+          return sensor_data;
+      break;
+      case "led":
+        return -1;
+      break;
+      case "color":
+          var p=[];
+          radians = MathUtil.degToRad(90 - util.target.direction+ang);
+          dx = delta * Math.cos(radians);
+          dy = delta * Math.sin(radians);
+          p[0]=util.target.x+dx; p[1]=util.target.y+dy; p[2]=0;
+          var d = []; d[0]=util.target.renderer._allDrawables[0];
+          var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
+          var l= [];
+          l = Renderer.getColor(p,d[0],c);
+          return l;
+      break;
+      case "touch":
+      return this.robot_touch(util,a);
+      break;
+      case "proximity":
+      return 255-this.robot_get_dist(util,ang,delta);
+      break;
+      case "ultrasonic":
+      return this.robot_get_dist(util,a,ang,delta);
+      break;
+      case "light":
+      var p=[];p[0]=util.target.x; p[1]=util.target.y; p[2]=0;
+      var d = []; d[0]=util.target.renderer._allDrawables[0];
+      var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
+      var l= [];
+      l = Renderer.getColor(p,d[0],c);
+      sensor_data=255 - Math.round(l[0]+l[1]+l[2])/3;
+      return sensor_data;
+      break;
+      default:
+      console.log("WTF");
+      break;
+      }
+    }
+
 
     robot_get_sensor_data(args, util){
 
-      //    console.log(`robot_get_sensor_data`);
+          console.log(`robot_get_sensor_data`);
 
           var sensor = args.ROBOT_SENSORS;
           var sensor_data = null;
@@ -500,42 +680,62 @@ class Scratch3RobotBlocks {
           switch (sensor) {
             case "sensor1":
 
-            sensor_data = this.runtime.RCA.getSensorData(0);
-
+            //  console.warn("VM"+this.runtime.sens_list[0]);
+              if(this.sim_ac){
+              sensor_data = this.robot_set_sens(util,0);
+              }
+              else
+              sensor_data = this.runtime.RCA.getSensorData(0);
               break;
 
            case "sensor2":
 
-                sensor_data = this.runtime.RCA.getSensorData(1);
-
-              break;
+           if(this.sim_ac){
+           sensor_data = this.robot_set_sens(util,1);
+           }
+           else
+           sensor_data = this.runtime.RCA.getSensorData(0);
+           break;
 
           case "sensor3":
 
-                sensor_data = this.runtime.RCA.getSensorData(2);
-
-              break;
+          if(this.sim_ac){
+          sensor_data = this.robot_set_sens(util,2);
+          }
+          else
+          sensor_data = this.runtime.RCA.getSensorData(0);
+          break;
 
           case "sensor4":
 
-                sensor_data = this.runtime.RCA.getSensorData(3);
-
-                 break;
+          if(this.sim_ac){
+          sensor_data = this.robot_set_sens(util,3);
+          }
+          else
+          sensor_data = this.runtime.RCA.getSensorData(0);
+          break;
 
          case "sensor5":
 
-                sensor_data = this.runtime.RCA.getSensorData(4);
-
-              break;
+         if(this.sim_ac){
+         sensor_data = this.robot_set_sens(util,4);
+         }
+         else
+         sensor_data = this.runtime.RCA.getSensorData(0);
+         break;
 
         case "sensor_trip_meter_left":
-
+              if(this.sim_ac)
+              sensor_data = this.sim_dist_l;
+              else
               sensor_data = this.runtime.RCA.getLeftPath();
 
             break;
 
         case "sensor_trip_meter_right":
-
+              if(this.sim_ac)
+              sensor_data = this.sim_dist_r;
+              else
               sensor_data = this.runtime.RCA.getRightPath();
 
             break;
@@ -552,14 +752,48 @@ class Scratch3RobotBlocks {
 
     }
 
-    robot_get_rgb_sensor_data(args){
+    robot_get_rgb_sensor_data(args,util){
 
       //    console.log(`robot_get_rgb_sensor_data   sensor: ${args.ROBOT_SENSORS_FOR_RGB} color: ${args.RGB_VALUES} `);
 
           let sensor_id = Number(args.ROBOT_SENSORS_FOR_RGB.replace("sensor","")) - 1;
 
           let rgb_array = this.runtime.RCA.getColorCorrectedRawValues(sensor_id);
+          if(this.sim_ac){
+        var p=[];  p[0]=util.target.x; p[1]=util.target.y; p[2]=0;
+        var d = []; d[0]=util.target.renderer._allDrawables[0];
+        var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
+        var l= [];
+        l = Renderer.getColor(p,d[0],c);
+  //      console.warn("result is"+l);
+        switch (args.RGB_VALUES) {
 
+          case "red":
+
+                return l[0];
+
+            break;
+
+        case "green":
+
+                return l[1];
+
+          break;
+
+        case "blue":
+
+                  return l[2];
+
+            break;
+
+          default:
+
+                return -1; // TODO: правильно обрабатывать
+
+        }
+
+      }
+      else
           switch (args.RGB_VALUES) {
 
             case "red":
@@ -588,7 +822,6 @@ class Scratch3RobotBlocks {
 
 
     }
-
     robot_is_current_color(args){
 
     //   console.log(`robot_is_current_color   sensor: ${args.ROBOT_SENSORS_FOR_RGB} color: ${args.COLORS} `);
@@ -643,7 +876,7 @@ class Scratch3RobotBlocks {
 
 
           this.power_left   =   Math.round(this.power_in_percent_left * 0.63) +  64;
-
+          this.sim_pl=-Math.round(this.power_in_percent_left * 0.63);
 
         break;
 
@@ -660,7 +893,7 @@ class Scratch3RobotBlocks {
 
 
           this.power_right   =   Math.round(this.power_in_percent_right * 0.63);
-
+          this.sim_pr=Math.round(this.power_in_percent_right * 0.63);
 
         break;
 
@@ -668,7 +901,7 @@ class Scratch3RobotBlocks {
 
 
           this.power_right   =   Math.round(this.power_in_percent_right * 0.63) +  64;
-
+          this.sim_pr=-Math.round(this.power_in_percent_right * 0.63);
 
         break;
 
@@ -681,16 +914,16 @@ class Scratch3RobotBlocks {
 
                 if (this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                      
+
                    this.activate_robot_power();
-                   this.runtime.RCA.unblock_A_CommandQueue();  
-          
-                  
+                   this.runtime.RCA.unblock_A_CommandQueue();
+
+
                   }else{
 
-                    this.runtime.RCA.block_A_CommandQueue();  
+                    this.runtime.RCA.block_A_CommandQueue();
                     util.yield();
-                    
+
 
                   }
 
@@ -698,6 +931,7 @@ class Scratch3RobotBlocks {
 
 
     }
+
 
     check_65535(steps){
 
@@ -735,29 +969,6 @@ class Scratch3RobotBlocks {
     }
 
     robot_motors_on_for_steps(args, util){
-
-     // console.log(`robot_motors_on_for_steps`);
-
-
-      // var steps =   this.check_65535(args.STEPS);
-      //
-      //
-      //
-      // if (steps != 0){
-      //
-      //   let power_left = this.power_left;
-      //   let power_right = this.power_right;
-      //
-      //   this.runtime.RCA.setRobotPowerAndStepLimits(power_left,power_right,steps,0);
-      //
-      //
-      //
-      // }else return;
-
-
-    //  clearInterval(this.motors_off_interval);
-    // this.runtime.RCA.setRobotPower(0,0,0);
-
     this.is_motors_on_active = false;
 
       clearTimeout(this.robot_motors_on_for_seconds_timeout_stop);
@@ -779,7 +990,9 @@ class Scratch3RobotBlocks {
             //   console.warn(`robot_motors_on_for_steps  exit function steps: ${util.stackFrame.steps} stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
 
                 util.stackFrame.steps = null;
-
+                clearInterval(this.sim_int);
+                this.distl=0;
+                this.distr=0;
                 //this.need_to_stop = true; //for robot_set_direction_to //modified_by_Yaroslav
 
 
@@ -792,18 +1005,18 @@ class Scratch3RobotBlocks {
             if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
                 // console.warn(`robot_motors_on_for_steps not ready to accept command`);
-                this.runtime.RCA.block_A_CommandQueue(); 
+                this.runtime.RCA.block_A_CommandQueue();
                 util.yield();
                 return;
 
             }else{
-               
-               this.runtime.RCA.unblock_A_CommandQueue(); 
+
+               this.runtime.RCA.unblock_A_CommandQueue();
 
             }
 
           //console.error(`robot_motors_on_for_steps 1`);
-  
+
 
           util.stackFrame.steps = this.check_65535(args.STEPS);
 
@@ -820,8 +1033,32 @@ class Scratch3RobotBlocks {
 
           this.need_to_stop = false;
           this.runtime.RCA.setRobotPowerAndStepLimits(this.power_left,this.power_right,util.stackFrame.steps,0);
-
-
+          clearInterval(this.sim_int);
+          this.xc=util.target.x;
+          this.yc=util.target.y;
+                this.distl=0;
+                this.distr=0;
+          if(this.sim_ac){
+            this.sim_int = setInterval(() => {
+             const radians = MathUtil.degToRad(90 - util.target.direction);
+             let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+             this.sim_dist_l+=Math.abs(this.sim_pl*this.kW);
+             this.sim_dist_r+=Math.abs(this.sim_pr*this.kW);
+             this.distl+=Math.abs(this.sim_pl*this.kW);
+             this.distr+=Math.abs(this.sim_pr*this.kW);
+             const dx = dist * Math.cos(radians);
+             const dy = dist * Math.sin(radians);
+             this.yc+=dy;
+             this.xc+=dx;
+             util.target.setXY(this.xc, this.yc);
+             if(util.target.isTouchingColor(this.wall_color)){
+               this.yc-=dy;
+               this.xc-=dx;
+               util.target.setXY(this.xc, this.yc);
+             }
+             util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
+              }, this.fps);
+          }
 
 
 
@@ -835,25 +1072,6 @@ class Scratch3RobotBlocks {
 
     robot_turnright(args, util){
 
-
-    //   clearInterval(this.motors_on_interval);
-    // //  clearInterval(this.motors_off_interval);
-    //  this.runtime.RCA.setRobotPower(0,0,0);
-    //
-    //
-    //
-    //       var steps = this.check_65535(Math.round(args.DEGREES / DEGREE_RATIO));
-    //
-    //       if (steps != 0){
-    //
-    //       let power_left =   Math.round(30 * 0.63);
-    //       let power_right =  Math.round(30 * 0.63) + 64;
-    //
-    //       this.runtime.RCA.setRobotPowerAndStepLimits(power_left,power_right,steps,0);
-    //
-    //       }
-
-
     this.is_motors_on_active = false;
 
     clearTimeout(this.robot_motors_on_for_seconds_timeout_stop);
@@ -866,7 +1084,7 @@ class Scratch3RobotBlocks {
       var stepsDeltaLeft  =  this.calculate_steps_delta_left();
       var stepsDeltaRight =  this.calculate_steps_delta_right();
 
-      if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop) ) { // TODO: сделать корректную проверку для робота без энкодеров
+      if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100 && this.distr<Number(args.DEGREES)/230*100) ) { // TODO: сделать корректную проверку для робота без энкодеров
 
       //      console.log(`robot_turnright stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
 
@@ -878,7 +1096,7 @@ class Scratch3RobotBlocks {
         } else{
 
           //    console.log(`robot_turnright exit function stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
-
+            clearInterval(this.sim_int);
               util.stackFrame.steps = null;
 
               //this.need_to_stop = true; //for robot_set_direction_to //modified_by_Yaroslav
@@ -889,13 +1107,13 @@ class Scratch3RobotBlocks {
 
            if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                this.runtime.RCA.block_A_CommandQueue(); 
+                this.runtime.RCA.block_A_CommandQueue();
                 util.yield();
                 return;
 
             }else{
-               
-               this.runtime.RCA.unblock_A_CommandQueue(); 
+
+               this.runtime.RCA.unblock_A_CommandQueue();
 
             }
 
@@ -904,7 +1122,7 @@ class Scratch3RobotBlocks {
         this.stepsInitValueRight =  this.runtime.RCA.getRightPath();
       //  util.stackFrame.steps_counter = 0;
 
-
+        clearInterval(this.sim_int);
         clearInterval(this.motors_on_interval);
         // //  clearInterval(this.motors_off_interval);
       //  this.runtime.RCA.setRobotPower(0,0,0);
@@ -918,13 +1136,33 @@ class Scratch3RobotBlocks {
 
         let power_left =   Math.round(30 * 0.63);
         let power_right =  Math.round(30 * 0.63) + 64;
+        clearInterval(this.sim_int);
+        this.sim_pl=30;
+        this.sim_pr=-30;
 
+              this.distl=0;
+              this.distr=0;
+        if(this.sim_ac){
+            this.xc=util.target.x;
+            this.yc=util.target.y;
+          this.sim_int = setInterval(() => {
+           const radians = MathUtil.degToRad(90 - util.target.direction);
+           let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+           this.sim_dist_l+=Math.abs(this.sim_pl*this.kW);
+           this.sim_dist_r+=Math.abs(this.sim_pr*this.kW);
+
+           this.distl+=Math.abs(this.sim_pl*this.kW);
+           this.distr+=Math.abs(this.sim_pr*this.kW);
+           const dx = dist * Math.cos(radians);
+           const dy = dist * Math.sin(radians);
+           this.yc+=dy;
+           this.xc+=dx;
+           util.target.setXY(this.xc, this.yc);
+           util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
+            }, this.fps);
+        }
         this.runtime.RCA.setRobotPowerAndStepLimits(power_left,power_right, util.stackFrame.steps ,0);
-      //  util.stackFrame.steps_counter++;
-
-
-          this.need_to_stop = false;
-
+        this.need_to_stop = false;
         util.yield();
     }
 
@@ -960,7 +1198,7 @@ class Scratch3RobotBlocks {
             var stepsDeltaLeft  =  this.calculate_steps_delta_left();
             var stepsDeltaRight =  this.calculate_steps_delta_right();
 
-            if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop) ) { // TODO: сделать корректную проверку для робота без энкодеров
+            if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100 && this.distr<Number(args.DEGREES)/230*100)  ) { // TODO: сделать корректную проверку для робота без энкодеров
 
             //      console.log(`robot_turnleft stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
 
@@ -972,7 +1210,7 @@ class Scratch3RobotBlocks {
               } else{
 
               //      console.log(`robot_turnleft exit function stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
-
+                    clearInterval(this.sim_int);
                     util.stackFrame.steps = null;
 
                     //this.need_to_stop = true; //for robot_set_direction_to //modified_by_Yaroslav
@@ -982,16 +1220,16 @@ class Scratch3RobotBlocks {
 
               if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                this.runtime.RCA.block_A_CommandQueue(); 
+                this.runtime.RCA.block_A_CommandQueue();
                 util.yield();
                 return;
 
               }else{
-               
-               this.runtime.RCA.unblock_A_CommandQueue(); 
+
+               this.runtime.RCA.unblock_A_CommandQueue();
 
               }
-
+              clearInterval(this.sim_int);
               util.stackFrame.steps = this.check_65535(Math.round(args.DEGREES / DEGREE_RATIO))
               this.stepsInitValueLeft  =  this.runtime.RCA.getLeftPath();
               this.stepsInitValueRight =  this.runtime.RCA.getRightPath();
@@ -1011,13 +1249,32 @@ class Scratch3RobotBlocks {
 
               let power_left =   Math.round(30 * 0.63) + 64;
               let power_right =  Math.round(30 * 0.63);
+              clearInterval(this.sim_int);
+              this.sim_pl=-30;
+              this.sim_pr=30;
 
+                    this.distl=0;
+                    this.distr=0;
+              if(this.sim_ac){
+                  this.xc=util.target.x;
+                  this.yc=util.target.y;
+                this.sim_int = setInterval(() => {
+                 const radians = MathUtil.degToRad(90 - util.target.direction);
+                 let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
+                 this.sim_dist_l+=Math.abs(this.sim_pl*this.kW);
+                 this.sim_dist_r+=Math.abs(this.sim_pr*this.kW);
+                 this.distl+=Math.abs(this.sim_pl*this.kW);
+                 this.distr+=Math.abs(this.sim_pr*this.kW);
+                 const dx = dist * Math.cos(radians);
+                 const dy = dist * Math.sin(radians);
+                 this.yc+=dy;
+                 this.xc+=dx;
+                 util.target.setXY(this.xc, this.yc);
+                 util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
+                  }, this.fps);
+              }
               this.runtime.RCA.setRobotPowerAndStepLimits(power_left,power_right, util.stackFrame.steps ,0);
-            //  util.stackFrame.steps_counter++;
-
-
               this.need_to_stop = false;
-
               util.yield();
           }
 
@@ -1040,16 +1297,16 @@ class Scratch3RobotBlocks {
 
                 if (this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                      
+
                    this.activate_robot_power();
-                   this.runtime.RCA.unblock_A_CommandQueue();  
-          
-                  
+                   this.runtime.RCA.unblock_A_CommandQueue();
+
+
                   }else{
 
-                    this.runtime.RCA.block_A_CommandQueue();  
+                    this.runtime.RCA.block_A_CommandQueue();
                     util.yield();
-                    
+
 
                   }
 
@@ -1072,16 +1329,16 @@ class Scratch3RobotBlocks {
 
                 if (this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-                      
+
                    this.activate_robot_power();
-                   this.runtime.RCA.unblock_A_CommandQueue();  
-          
-                  
+                   this.runtime.RCA.unblock_A_CommandQueue();
+
+
                   }else{
 
-                    this.runtime.RCA.block_A_CommandQueue();  
+                    this.runtime.RCA.block_A_CommandQueue();
                     util.yield();
-                    
+
 
                   }
 
@@ -1100,19 +1357,19 @@ class Scratch3RobotBlocks {
 
     //   console.log(`robot_turn_led_on led_position: ${args.ROBOT_POSITION}`);
 
-       if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){ 
+       if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-              this.runtime.RCA.block_A_CommandQueue();  //not ready right now 
+              this.runtime.RCA.block_A_CommandQueue();  //not ready right now
               util.yield();
               return;
-                    
+
 
         }
 
 
         //here we ready
 
-        this.runtime.RCA.unblock_A_CommandQueue(); 
+        this.runtime.RCA.unblock_A_CommandQueue();
 
        switch (args.ROBOT_POSITION) {
 
@@ -1155,13 +1412,13 @@ class Scratch3RobotBlocks {
     robot_turn_led_off(args, util){
 
     //  console.log(`robot_turn_led_off led_position: ${args.ROBOT_POSITION}`);
-      
-      if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){ 
 
-              this.runtime.RCA.block_A_CommandQueue();  //not ready right now 
+      if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
+
+              this.runtime.RCA.block_A_CommandQueue();  //not ready right now
               util.yield();
               return;
-                    
+
 
         }
 
@@ -1204,15 +1461,16 @@ class Scratch3RobotBlocks {
 
       }
 
-      this.runtime.RCA.unblock_A_CommandQueue(); 
+      this.runtime.RCA.unblock_A_CommandQueue();
 
 
     }
 
     robot_reset_trip_meters(args, util){
 
-  //    console.log(`robot_reset_trip_meters`);
-
+      if(this.sim_ac)
+      {this.sim_dist_l=0;
+      this.sim_dist_r=0;}
       this.runtime.RCA.resetTripMeters();
 
     }
@@ -1223,12 +1481,12 @@ class Scratch3RobotBlocks {
 
         var degrees = this.check_value_out_of_range(args.CLAW_CLOSED_PERCENT,0,100);
 
-        if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){ 
+        if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-              this.runtime.RCA.block_A_CommandQueue();  //not ready right now 
+              this.runtime.RCA.block_A_CommandQueue();  //not ready right now
               util.yield();
               return;
-                    
+
 
         }
 
@@ -1236,7 +1494,7 @@ class Scratch3RobotBlocks {
         //here we ready
          this.runtime.RCA.setClawDegrees(degrees,0);
 
-        this.runtime.RCA.unblock_A_CommandQueue(); 
+        this.runtime.RCA.unblock_A_CommandQueue();
 
     }
 
@@ -1244,12 +1502,12 @@ class Scratch3RobotBlocks {
 
     //    console.log(`robot_claw_state state: ${args.CLAW_STATES}`);
 
-       if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){ 
+       if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
-              this.runtime.RCA.block_A_CommandQueue();  //not ready right now 
+              this.runtime.RCA.block_A_CommandQueue();  //not ready right now
               util.yield();
               return;
-                    
+
 
         }
 
@@ -1280,10 +1538,21 @@ class Scratch3RobotBlocks {
 
         }
 
-        this.runtime.RCA.unblock_A_CommandQueue(); 
+        this.runtime.RCA.unblock_A_CommandQueue();
 
 
 
+    }
+    robot_wall_color(args)
+    {
+      console.warn("WAS");
+      console.warn(this.wall_color);
+      const maskColor = Cast.toRgbColorList(args.COLOR);
+      this.wall_color[0] = Cast.toNumber(maskColor[0]);
+        this.wall_color[1] = Cast.toNumber(maskColor[1]);
+          this.wall_color[2] = Cast.toNumber(maskColor[2]);
+          console.warn("NOW");
+            console.warn(this.wall_color);
     }
 
     }

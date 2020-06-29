@@ -77,7 +77,7 @@ class VirtualMachine extends EventEmitter {
          * @type {Target}
          */
         this.editingTarget = null;
-
+        this.runtime.sens_list = ["-1","-1","-1","-1","-1"];
         /**
          * The currently dragging target, for redirecting IO data.
          * @type {Target}
@@ -456,7 +456,7 @@ class VirtualMachine extends EventEmitter {
 
        // const projectJson = this.toJSON(); //original
 
-        
+
         var infa = {};
         infa.projectJson=projectJson;
         infa.costumeDescs=costumeDescs;
