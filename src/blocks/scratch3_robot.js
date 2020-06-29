@@ -978,7 +978,7 @@ class Scratch3RobotBlocks {
         var stepsDeltaLeft  =  this.calculate_steps_delta_left();
         var stepsDeltaRight =  this.calculate_steps_delta_right();
 
-        if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps) && (!this.need_to_stop) ) {  // TODO: сделать корректную проверку для робота без энкодеров
+        if ((stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps) && (!this.need_to_stop) && (this.distl<Number(args.STEPS) && this.distr<Number(args.STEPS))) {  // TODO: сделать корректную проверку для робота без энкодеров
 
           // console.warn(`robot_motors_on_for_steps steps: ${util.stackFrame.steps} stepsDeltaLeft: ${stepsDeltaLeft} stepsDeltaRight: ${stepsDeltaRight}`);
 
@@ -1001,7 +1001,7 @@ class Scratch3RobotBlocks {
 
 
             clearInterval(this.motors_on_interval);
-
+            clearInterval(this.sim_int);
             if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
 
                 // console.warn(`robot_motors_on_for_steps not ready to accept command`);
