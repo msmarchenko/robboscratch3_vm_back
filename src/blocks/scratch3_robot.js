@@ -66,9 +66,9 @@ class Scratch3RobotBlocks {
         });
         this.runtime.sim_ac=false;
         this.runtime.going=false;
-        this.kW=0.05; // шаг движения робота
+        this.kW=0.01; // шаг движения робота
         this.fps = 6; // Скорость обработки кадров инверсивно меняется 1000/5 = 200   = 72 клетки  =
-        this.rad= 1000;// угол поворопа меняет
+        this.rad= 883;// угол поворопа меняет
         this.xc= 0;
         this.yc=0;
         this.sim_dist_l=0;
@@ -137,7 +137,7 @@ class Scratch3RobotBlocks {
   }
 
   robot_motors_on_for_seconds (args, util) {
-      this.last_util=util;
+
       clearTimeout(this.robot_motors_on_for_seconds_end_timeout);
        this.robot_motors_on_for_seconds_end_timeout = setTimeout(() => {
           this.runtime.RCA.setRobotPower(0,0,0);
@@ -225,7 +225,7 @@ class Scratch3RobotBlocks {
 
 
     if(this.runtime.sim_ac){
-      this.last_util=util;
+
       clearInterval(this.sim_int);
       this.runtime.going=true;
       this.xc=util.target.x;
@@ -349,10 +349,10 @@ class Scratch3RobotBlocks {
 
 
   robot_set_direction_to(args, util){
-              this.last_util=util;
+
         this.robot_direction = args.ROBOT_DIRECTION;
-        if(!this.runtime.sim_ac){
             this.update_power_using_direction(this.robot_direction);
+            if(!this.runtime.sim_ac){
             if (this.is_motors_on_active){
                 if (this.runtime.RCA.isRobotReadyToAcceptCommand()){
                    this.activate_robot_power();
@@ -374,45 +374,25 @@ class Scratch3RobotBlocks {
 
   robot_touch(util,a,angle,delta){
 
-            if(this.minidist==0){
-            var radians = MathUtil.degToRad(90 - util.target.direction);
-            if(a==3 || a==2)
-            radians = MathUtil.degToRad(90 - util.target.direction+180);
-            const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
-            this.ddx = 1.5 * Math.cos(radians);
-            this.ddy = 1.5 * Math.sin(radians);
-            this.robot_delta_x = delta * Math.cos(new_rad);
-            this.robot_delta_y = delta * Math.sin(new_rad);
-            this.ddp = [];this.ddp[0]=util.target.x; this.ddp[1]=util.target.y; this.ddp[2]=0;
-            this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
-            this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
-            this.ddl= [];
-            }
-            if(this.minidist<=25)
-            {
-              this.ddp[0]=Math.round(util.target.x+this.ddx*this.minidist+this.robot_delta_x);
-              this.ddp[1]=Math.round(util.target.y+this.ddy*this.minidist+this.robot_delta_y);
-              this.ddl = Renderer.getColor(this.ddp,this.ddd[0],this.ddc);
-            if(this.ddl[0]==this.wall_color[0]&&this.ddl[1]==this.wall_color[1]&&this.ddl[2]==this.wall_color[2])
-            {
-              this.minidist=0;
-              //console.error("100!!!");
-              return 100;
-            }
-            this.minidist++;
-            }
-            else {
-              this.minidist=0;
-              //console.error("0!!!");
-              return 0;
-            }
-            //console.warn("dist: "+this.minidist + "\n color " + this.ddl[0]+ " " + this.ddl[1]+ " " + this.ddl[2]+ "mesto"+ this.ddp[0]+" "+this.ddp[1]);
-            util.yield();
-
+    var radians = MathUtil.degToRad(90 - util.target.direction);
+    if(a==3 || a==2)
+    radians = MathUtil.degToRad(90 - util.target.direction+180);
+    const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
+    this.ddx = 1.5 * Math.cos(radians);
+    this.ddy = 1.5 * Math.sin(radians);
+    this.robot_delta_x = delta * Math.cos(new_rad);
+    this.robot_delta_y = delta * Math.sin(new_rad);
+    this.ddp = [];this.ddp[0]=util.target.x+this.robot_delta_x; this.ddp[1]=util.target.y+this.robot_delta_y; this.ddp[2]=0;this.ddp[3]=0;;
+    this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+    this.ddl = []; this.ddl[0]=this.wall_color[0];this.ddl[1]=this.wall_color[1];this.ddl[2]=this.wall_color[2];
+if(Renderer.getDist(this.ddp,this.ddd[0],radians,this.ddl)>20)
+  return 0;
+return 100;
     }
 
   robot_get_dist(util,a,angle,delta){
 
+/*
             if(this.minidist==0){
             var radians = MathUtil.degToRad(90 - util.target.direction);
             if(a==3 || a==2)
@@ -422,7 +402,7 @@ class Scratch3RobotBlocks {
             this.ddy = 1.5 * Math.sin(radians);
             this.robot_delta_x = delta * Math.cos(new_rad);
             this.robot_delta_y = delta * Math.sin(new_rad);
-            this.ddp = [];this.ddp[0]=util.target.x; this.ddp[1]=util.target.y; this.ddp[2]=0;
+
             this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
             this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
             this.ddl= [];
@@ -444,8 +424,23 @@ class Scratch3RobotBlocks {
               this.minidist=0;
               return 100;
             }
+
+
+            */
+            var radians = MathUtil.degToRad(90 - util.target.direction);
+            if(a==3 || a==2)
+            radians = MathUtil.degToRad(90 - util.target.direction+180);
+            const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
+            this.ddx = 1.5 * Math.cos(radians);
+            this.ddy = 1.5 * Math.sin(radians);
+            this.robot_delta_x = delta * Math.cos(new_rad);
+            this.robot_delta_y = delta * Math.sin(new_rad);
+            this.ddp = [];this.ddp[0]=util.target.x+this.robot_delta_x; this.ddp[1]=util.target.y+this.robot_delta_y; this.ddp[2]=0;this.ddp[3]=0;;
+            this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+            this.ddl = []; this.ddl[0]=this.wall_color[0];this.ddl[1]=this.wall_color[1];this.ddl[2]=this.wall_color[2];
+
+          return Renderer.getDist(this.ddp,this.ddd[0],radians,this.ddl);
             //  console.warn("dist: "+this.minidist + "\n color " + this.ddl[0]+ " " + this.ddl[1]+ " " + this.ddl[2]+ "mesto"+ this.ddp[0]+" "+this.ddp[1]);
-            util.yield();
     }
 
   robot_set_sens(util,a){
@@ -696,7 +691,7 @@ class Scratch3RobotBlocks {
   }
 
   robot_set_motors_left_right_power_and_direction_separately(args, util){
-      this.last_util=util;
+
                      // this.runtime.RCA.setRobotPower(0,0,0);
     this.power_in_percent_left  =   (args.POWER_LEFT > 100)?100:((args.POWER_LEFT < 0)?0:args.POWER_LEFT);
     this.power_in_percent_right =   (args.POWER_RIGHT > 100)?100:((args.POWER_RIGHT < 0)?0:args.POWER_RIGHT);
@@ -810,7 +805,7 @@ class Scratch3RobotBlocks {
 
   robot_motors_on_for_steps(args, util){
     this.is_motors_on_active = false;
-      this.last_util=util;
+
       clearTimeout(this.robot_motors_on_for_seconds_timeout_stop);
       if ((util.stackFrame.steps != null) && (typeof(util.stackFrame.steps) != 'undefined') ) {
         var stepsDeltaLeft  =  this.calculate_steps_delta_left();
@@ -883,7 +878,6 @@ class Scratch3RobotBlocks {
     }
 
   robot_turnright(args, util){
-      this.last_util=util;
     this.is_motors_on_active = false;
     clearTimeout(this.robot_motors_on_for_seconds_timeout_stop);
     if ((util.stackFrame.steps != null) && (typeof(util.stackFrame.steps) != 'undefined')) {
@@ -911,7 +905,6 @@ class Scratch3RobotBlocks {
         this.runtime.going=false;
         clearInterval(this.motors_on_interval);
       if (util.stackFrame.steps <= 0) {
-
             return;
         }
         let power_left =   Math.round(30 * 0.63);
@@ -947,12 +940,10 @@ class Scratch3RobotBlocks {
         this.need_to_stop = false;
         util.yield();
     }
-
-
     }
 
   robot_turnleft(args, util){
-      this.last_util=util;
+
           this.is_motors_on_active = false;
 
           clearTimeout(this.robot_motors_on_for_seconds_timeout_stop);
@@ -1042,7 +1033,7 @@ class Scratch3RobotBlocks {
     }
 
   robot_set_motors_power(args, util){
-      this.last_util=util;
+
       let power = this.check_value_out_of_range(args.POWER,0,100);
         this.power_in_percent_left    =   power;
         this.power_in_percent_right   =   power;
@@ -1070,7 +1061,7 @@ class Scratch3RobotBlocks {
     }
 
   robot_set_motors_power_left_right_separately(args, util){
-      this.last_util=util;
+
                    //   this.runtime.RCA.setRobotPower(0,0,0);
       this.power_in_percent_left    =   this.check_value_out_of_range(args.POWER_LEFT,0,100);
       this.power_in_percent_right   =   this.check_value_out_of_range(args.POWER_RIGHT,0,100);
@@ -1221,7 +1212,7 @@ class Scratch3RobotBlocks {
     }
 
   robot_reset_trip_meters(args, util){
-      this.last_util=util;
+
       if(this.runtime.sim_ac)
       {this.sim_dist_l=0;
       this.sim_dist_r=0;}
