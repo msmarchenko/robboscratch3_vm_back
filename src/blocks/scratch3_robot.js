@@ -89,6 +89,7 @@ class Scratch3RobotBlocks {
         this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
         this.ddl = 0 ;
         this.last_util = {};
+        this.start_deg=0;
     }
 
     /**
@@ -120,7 +121,8 @@ class Scratch3RobotBlocks {
             robot_get_dist:this.robot_get_dist,
             robot_touch:this.robot_touch,
             robot_wall_color:this.robot_wall_color,
-            getSensorDataFromLastUtil:this.getSensorDataFromLastUtil
+            getSensorDataFromLastUtil:this.getSensorDataFromLastUtil,
+            robot_first_draw:this.robot_first_draw
         };
     }
 
@@ -133,6 +135,9 @@ class Scratch3RobotBlocks {
   getSensorDataFromLastUtil(index){
   //  console.warn(this.runtime.util);
 //    console.warn(this.last_util);
+
+//console.warn(this.last_util.target.renderer._allDrawables);
+//console.warn(this.last_util.target.renderer);
     return(this.robot_set_sens(this.last_util,index));
   }
 
@@ -237,7 +242,12 @@ class Scratch3RobotBlocks {
       this.yc+=dy;
       this.xc+=dx;
       util.target.setXY(this.xc, this.yc);
-
+      if(util.target.isTouchingColor(this.wall_color)){
+        this.yc-=dy;
+        this.xc-=dx;
+        util.target.setXY(this.xc, this.yc);
+      }
+      util.target.setDirection(util.target.direction + MathUtil.radToDeg(Math.atan((this.sim_pl-this.sim_pr)/this.rad)));
       this.sim_int = setInterval(() => {
         const radians = MathUtil.degToRad(90 - util.target.direction);
         let dist = (this.sim_pl+this.sim_pr)/2*this.kW;
@@ -347,6 +357,15 @@ class Scratch3RobotBlocks {
       }
     }
 
+robot_first_draw(util){
+  if(typeof(util.target.renderer._allDrawables)!=="undefined")
+  for (let key in util.target.renderer._allDrawables) {
+        if(typeof(util.target.renderer._allDrawables[key])!=="undefined" && util.target.renderer._allDrawables[key]!= null ){
+    //      console.warn(util.target.renderer._allDrawables[key]);
+        return util.target.renderer._allDrawables[key];}
+        }
+    return "jopa";
+}
 
   robot_set_direction_to(args, util){
 
@@ -383,7 +402,7 @@ class Scratch3RobotBlocks {
     this.robot_delta_x = delta * Math.cos(new_rad);
     this.robot_delta_y = delta * Math.sin(new_rad);
     this.ddp = [];this.ddp[0]=util.target.x+this.robot_delta_x; this.ddp[1]=util.target.y+this.robot_delta_y; this.ddp[2]=0;this.ddp[3]=0;;
-    this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+    this.ddd = []; this.ddd[0]=this.robot_first_draw(util);
     this.ddl = []; this.ddl[0]=this.wall_color[0];this.ddl[1]=this.wall_color[1];this.ddl[2]=this.wall_color[2];
 if(Renderer.getDist(this.ddp,this.ddd[0],radians,this.ddl)>20)
   return 0;
@@ -392,41 +411,6 @@ return 100;
 
   robot_get_dist(util,a,angle,delta){
 
-/*
-            if(this.minidist==0){
-            var radians = MathUtil.degToRad(90 - util.target.direction);
-            if(a==3 || a==2)
-            radians = MathUtil.degToRad(90 - util.target.direction+180);
-            const new_rad = MathUtil.degToRad(90 - util.target.direction+angle);
-            this.ddx = 1.5 * Math.cos(radians);
-            this.ddy = 1.5 * Math.sin(radians);
-            this.robot_delta_x = delta * Math.cos(new_rad);
-            this.robot_delta_y = delta * Math.sin(new_rad);
-
-            this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
-            this.ddc = [];this.ddc[0]=1;this.ddc[1]=1;this.ddc[2]=1;this.ddc[3]=1;
-            this.ddl= [];
-            }
-            if(this.minidist!=50)
-            {
-              this.ddp[0]=Math.round(util.target.x+this.ddx*this.minidist+this.robot_delta_x);
-              this.ddp[1]=Math.round(util.target.y+this.ddy*this.minidist+this.robot_delta_y);
-              this.ddl = Renderer.getColor(this.ddp,this.ddd[0],this.ddc);
-            if(this.ddl[0]==this.wall_color[0]&&this.ddl[1]==this.wall_color[1]&&this.ddl[2]==this.wall_color[2])
-            {
-              let a = this.minidist*2;
-              this.minidist=0;
-              return a;
-            }
-            this.minidist++;
-            }
-            else {
-              this.minidist=0;
-              return 100;
-            }
-
-
-            */
             var radians = MathUtil.degToRad(90 - util.target.direction);
             if(a==3 || a==2)
             radians = MathUtil.degToRad(90 - util.target.direction+180);
@@ -436,11 +420,10 @@ return 100;
             this.robot_delta_x = delta * Math.cos(new_rad);
             this.robot_delta_y = delta * Math.sin(new_rad);
             this.ddp = [];this.ddp[0]=util.target.x+this.robot_delta_x; this.ddp[1]=util.target.y+this.robot_delta_y; this.ddp[2]=0;this.ddp[3]=0;;
-            this.ddd = []; this.ddd[0]=util.target.renderer._allDrawables[0];
+            this.ddd = []; this.ddd[0]=this.robot_first_draw(util);
             this.ddl = []; this.ddl[0]=this.wall_color[0];this.ddl[1]=this.wall_color[1];this.ddl[2]=this.wall_color[2];
 
           return Renderer.getDist(this.ddp,this.ddd[0],radians,this.ddl);
-            //  console.warn("dist: "+this.minidist + "\n color " + this.ddl[0]+ " " + this.ddl[1]+ " " + this.ddl[2]+ "mesto"+ this.ddp[0]+" "+this.ddp[1]);
     }
 
   robot_set_sens(util,a){
@@ -459,7 +442,7 @@ return 100;
           dx = delta * Math.cos(radians);
           dy = delta * Math.sin(radians);
           p[0]=util.target.x+dx; p[1]=util.target.y+dy; p[2]=0;
-          var d = []; d[0]=util.target.renderer._allDrawables[0];
+          var d = []; d[0]=this.robot_first_draw(util);
           var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
           var l= [];
           l = Renderer.getColor(p,d[0],c);
@@ -476,7 +459,7 @@ return 100;
           dx = delta * Math.cos(radians);
           dy = delta * Math.sin(radians);
           p[0]=util.target.x+dx; p[1]=util.target.y+dy; p[2]=0;
-          var d = []; d[0]=util.target.renderer._allDrawables[0];
+          var d = []; d[0]=this.robot_first_draw(util);
           var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
           var l= [];
           l = Renderer.getColor(p,d[0],c);
@@ -493,7 +476,7 @@ return 100;
           break;
           case "light":
           var p=[];p[0]=util.target.x; p[1]=util.target.y; p[2]=0;
-          var d = []; d[0]=util.target.renderer._allDrawables[0];
+          var d = []; d[0]=this.robot_first_draw(util);
           var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
           var l= [];
           l = Renderer.getColor(p,d[0],c);
@@ -513,7 +496,6 @@ return 100;
 
           switch (sensor) {
             case "sensor1":
-
             //  console.warn("VM"+this.runtime.sens_list[0]);
               if(this.runtime.sim_ac){
               sensor_data = this.robot_set_sens(util,0);
@@ -594,7 +576,7 @@ return 100;
 
       if(this.runtime.sim_ac){
         var p=[];  p[0]=util.target.x; p[1]=util.target.y; p[2]=0;
-        var d = []; d[0]=util.target.renderer._allDrawables[0];
+        var d = []; d[0]=this.robot_first_draw(util);
         var c = [];c[0]=1;c[1]=1;c[2]=1;c[3]=1;
         var l= [];
         l = Renderer.getColor(p,d[0],c);
@@ -883,12 +865,16 @@ return 100;
     if ((util.stackFrame.steps != null) && (typeof(util.stackFrame.steps) != 'undefined')) {
       var stepsDeltaLeft  =  this.calculate_steps_delta_left();
       var stepsDeltaRight =  this.calculate_steps_delta_right();
-      if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100 && this.distr<Number(args.DEGREES)/230*100) ) { // TODO: сделать корректную проверку для робота без энкодеров
+      if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100/5.636 && this.distr<Number(args.DEGREES)/230*100/5.636) ) { // TODO: сделать корректную проверку для робота без энкодеров
           util.yield();
         } else{
             clearInterval(this.sim_int);
             this.runtime.going=false;
             util.stackFrame.steps = null;
+            /*console.warn(this.start_deg);
+            console.warn(Number(args.DEGREES));
+            console.warn(this.start_deg+Number(args.DEGREES));*/
+            util.target.setDirection(this.start_deg+Number(args.DEGREES));
       }
     } else {
            if (!this.runtime.RCA.isRobotReadyToAcceptCommand()){
@@ -910,9 +896,11 @@ return 100;
         let power_left =   Math.round(30 * 0.63);
         let power_right =  Math.round(30 * 0.63) + 64;
         clearInterval(this.sim_int);
+
         if(this.runtime.sim_ac){
   //        console.warn(this.sim_pr);
           this.runtime.going=true;
+        this.start_deg = util.target.direction;
           let simpl=30;
           let simpr=-30;
           this.distl=0;
@@ -955,7 +943,7 @@ return 100;
             var stepsDeltaLeft  =  this.calculate_steps_delta_left();
             var stepsDeltaRight =  this.calculate_steps_delta_right();
 
-            if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100 && this.distr<Number(args.DEGREES)/230*100)  ) { // TODO: сделать корректную проверку для робота без энкодеров
+            if (  (stepsDeltaLeft < util.stackFrame.steps  ) && (stepsDeltaRight < util.stackFrame.steps)  && (!this.need_to_stop)&& (this.distl<Number(args.DEGREES)/230*100/5.636 && this.distr<Number(args.DEGREES)/230*100/5.636)  ) { // TODO: сделать корректную проверку для робота без энкодеров
 
                 util.yield();
 
@@ -965,7 +953,7 @@ return 100;
                     clearInterval(this.sim_int);
                     util.stackFrame.steps = null;
                     this.runtime.going=false;
-
+                    util.target.setDirection(this.start_deg-Number(args.DEGREES));
               }
           } else {
 
@@ -1001,6 +989,7 @@ return 100;
               let power_right =  Math.round(30 * 0.63);
               if(this.runtime.sim_ac){
                   clearInterval(this.sim_int);
+                    this.start_deg = util.target.direction;
                   this.runtime.going=true;
                   let simpl=-30;
                   let simpr=30;
